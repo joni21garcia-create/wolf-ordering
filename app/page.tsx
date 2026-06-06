@@ -1037,7 +1037,7 @@ export default function Home() {
   </div>
 
 <a
-  href="https://calendly.com/joni-foralways/30min"
+  href="https://calendly.com/davy-garcia-wolfordering/30min"
   target="_blank"
   rel="noopener noreferrer"
   className="nav-button"
