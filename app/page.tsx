@@ -11,6 +11,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+import Link from "next/link";
+
 export default function Home() {
 
   const handleWhatsApp = () => {
@@ -1492,8 +1494,13 @@ export default function Home() {
 
             <h4>Legal</h4>
 
-            <a href="#">Políticas de privacidad</a>
-            <a href="#">Términos y condiciones</a>
+            <Link href="/terminos-y-condiciones">
+              Términos y condiciones
+            </Link>
+            
+            <Link href="/politica-de-privacidad">
+              Políticas de privacidad
+            </Link>
 
           </div>
 
@@ -1502,8 +1509,9 @@ export default function Home() {
             <h4>Contacto</h4>
 
             <p>📞 +593 989 328 777</p>
-            <p>📧 infowolfordering.com</p>
-            <p>📍 Ecuador</p>
+            <p>📧 info@wolfordering.com</p>
+            <p>📧 ventas@wolfordering.com</p>
+            <p>📧 ventas@wolfordering.com</p>
 
           </div>
 
