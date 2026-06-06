@@ -1511,7 +1511,7 @@ export default function Home() {
             <p>📞 +593 989 328 777</p>
             <p>📧 info@wolfordering.com</p>
             <p>📧 ventas@wolfordering.com</p>
-            <p>📧 ventas@wolfordering.com</p>
+            <p>📧 billing@wolfordering.com</p>
             <p>📧 demos@wolfordering.com</p>
           </div>
 
