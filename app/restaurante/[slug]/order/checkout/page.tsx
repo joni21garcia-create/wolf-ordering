@@ -1,60 +1,371 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
+import { supabase } from "@/app/lib/supabase";
 
 export default function CheckoutPage() {
 
-    const [order, setOrder] = useState<any>(null);
-  const router = useRouter();
+  const params = useParams();
+  const slug = params.slug as string;
 
-  const [paymentMethod, setPaymentMethod] =
-    useState("efectivo");
+  console.log(
+  "CHECKOUT PARAMS",
+  params
+);
 
-  const [customer, setCustomer] = useState({
-    name: "",
-    phone: "",
-    address: "",
-    reference: "",
-  });
+console.log(
+  "CHECKOUT SLUG",
+  slug
+);
+
+console.log("CHECKOUT PARAMS", params);
+console.log("CHECKOUT SLUG", slug);
+
+
+const [order, setOrder] = useState<any>(null);
+
+const router = useRouter();
+
+const [configRestaurante, setConfigRestaurante] =
+  useState<any>(null);
+
+const [paymentMethod, setPaymentMethod] =
+  useState("efectivo");
+
 useEffect(() => {
+  const cargarCheckout = async () => {
 
-  const savedOrder =
-    localStorage.getItem(
-      "terracotaOrder"
+    const savedOrder =
+      localStorage.getItem(
+        "terracotaOrder"
+      );
+
+    if (!savedOrder) {
+      router.push("/");
+      return;
+    }
+
+    const parsed =
+      JSON.parse(savedOrder);
+
+    console.log(
+      "ORDER FROM STORAGE",
+      parsed
     );
 
-  if (savedOrder) {
-    setOrder(
-      JSON.parse(savedOrder)
+    console.log(
+      JSON.stringify(
+        parsed,
+        null,
+        2
+      )
     );
-  }
 
-}, []);
-  const handleSubmit = () => {
+    setOrder(parsed);
+
+
+
+    const { data: config } =
+      await supabase
+        .from(
+          "configuracion_restaurante"
+        )
+        .select(
+          "costo_delivery"
+        )
+        .eq(
+          "restaurante_id",
+          parsed.restaurantId
+        )
+        .single();
+
+    console.log(
+      "CONFIG DELIVERY",
+      config
+    );
+
+    setConfigRestaurante(config);
+  };
+
+  cargarCheckout();
+
+}, [router]);
+
+
+
+const handleSubmit = async () => {
+
+  console.log("ORDER", order);
+
+  console.log(
+    "RESTAURANT ID",
+    order?.restaurantId
+  );
+
+    console.log("restaurantId =", order.restaurantId);
+console.log("restauranteId =", order.restauranteId);
+
+const total =
+  order.cart.reduce(
+    (acc: number, item: any) =>
+      acc + item.price * item.quantity,
+    0
+  );
+
+  const costoDelivery =
+  order?.serviceType === "delivery"
+    ? Number(
+        configRestaurante?.costo_delivery || 0
+      )
+    : 0;
+
+  const { data: config } = await supabase
+  .from("configuracion_restaurante")
+  .select(
+    "comision_wolf, tipo_comision"
+  )
+  .single();
+
+  const porcentaje =
+  config?.comision_wolf || 0;
+
+const tipo =
+  config?.tipo_comision ||
+  "aumentada";
+
+const comisionWolf =
+  Number(
+    (
+      total *
+      (porcentaje / 100)
+    ).toFixed(2)
+  );
+
+let totalCliente = total;
+
+let totalRestaurante = total;
+
+if (tipo === "aumentada") {
+  totalCliente =
+    total + comisionWolf +
+    costoDelivery;
+
+  totalRestaurante =
+    total;
+}
+
+if (tipo === "descontada") {
+  totalCliente =
+    total +
+    costoDelivery;
+
+  totalRestaurante =
+    total - comisionWolf +
+    costoDelivery;
+}
+
+  console.log(
+    "RESTAURANT SLUG",
+    order?.restaurantSlug
+  );
 
   if (!order) {
     alert("No existe pedido");
     return;
   }
 
-  const orderNumber =
-    "TC-" + Date.now();
+  try {
+    const orderNumber =
+      "TC-" + Date.now();
 
-  localStorage.setItem(
-    "lastOrder",
-    JSON.stringify({
-      ...order,
-      orderNumber,
-      paymentMethod,
-      createdAt:
-        new Date().toISOString(),
-    })
-  );
+    // =====================
+    // CLIENTE
+    // =====================
 
-  window.location.href =
-    "/restaurante/terracota-rooftop-cuenca/order/checkout/success";
+    const { data: cliente, error: clienteError } =
+      await supabase
+        .from("clientes")
+        .insert([
+          {
+            nombre: order.customerName,
+            telefono: order.customerPhone,
+          },
+        ])
+        .select()
+        .single();
+
+    if (clienteError) throw clienteError;
+
+    // =====================
+    // PEDIDO
+    // =====================
+
+console.log("ORDER", order);
+
+console.log(
+  "RESTAURANT ID",
+  order.restaurantId
+);
+
+console.log(
+  "restaurantId =",
+  order.restaurantId
+);
+
+const costoDelivery =
+  order.serviceType === "delivery"
+    ? Number(
+        configRestaurante?.costo_delivery || 0
+      )
+    : 0;
+
+console.log(
+  "COSTO DELIVERY A GUARDAR:",
+  costoDelivery
+);
+
+console.log("COSTO DELIVERY:", costoDelivery);
+console.log("ORDER:", order);
+
+console.log("TOTAL:", total);
+console.log("DELIVERY:", costoDelivery);
+console.log("TOTAL CLIENTE:", totalCliente);
+
+
+    const { data: pedido, error: pedidoError } =
+  await supabase
+    .from("pedidos")
+    .insert([
+{
+  restaurante_id: order.restaurantId,
+
+  cliente_id: cliente.id,
+
+  numero_orden: orderNumber,
+
+  estado: "recibido",
+
+  service_type: order.serviceType,
+
+  subtotal: total,
+
+  costo_delivery: costoDelivery,
+
+  total_cliente: totalCliente,
+
+  total_restaurante: totalRestaurante,
+
+  comision_wolf: comisionWolf,
+
+  metodo_pago: paymentMethod,
+
+  telefono_cliente: order.customerPhone,
+
+  nombre_cliente: order.customerName,
+
+  token_seguimiento: crypto.randomUUID(),
+}
+])
+    .select()
+    .single();
+
+    const trackingUrl =
+`${window.location.origin}/seguimiento/${pedido.token_seguimiento}`;
+
+console.log(
+  "TRACKING URL",
+  trackingUrl
+);
+
+    if (pedidoError) throw pedidoError;
+
+    console.log("PEDIDO GUARDADO");
+console.log(pedido);
+
+    console.log("PEDIDO GUARDADO");
+console.log(pedido);
+
+    // =====================
+    // ITEMS
+    // =====================
+
+const items = order.cart.map(
+  (item: any) => ({
+    pedido_id: pedido.id,
+
+
+
+    nombre_producto: item.name,
+    cantidad: item.quantity,
+    precio_unitario: item.price,
+
+    subtotal:
+      item.price * item.quantity,
+  })
+);
+console.log("CLIENTE", cliente);
+console.log("PEDIDO", pedido);
+console.log("ITEMS", items);
+
+    const { error: itemsError } =
+      await supabase
+        .from("pedido_items")
+        .insert(items);
+
+    if (itemsError) throw itemsError;
+
+
+localStorage.setItem(
+  "lastOrder",
+  JSON.stringify({
+    ...order,
+    orderNumber,
+    paymentMethod,
+    trackingUrl,
+    trackingToken: pedido.token_seguimiento,
+
+    deliveryCost: costoDelivery,
+    costoDelivery: costoDelivery,
+  })
+);
+
+console.log(
+  "COSTO DELIVERY GUARDADO:",
+  costoDelivery
+);
+
+alert(`SLUG = ${slug}`);         
+
+window.location.href =
+     `/restaurante/${slug}/order/success`
+
+  } catch (error: any) {
+    console.error("ERROR COMPLETO:", error);
+
+    alert(
+      JSON.stringify(error, null, 2)
+    );
+  }
 };
+
+if (!order) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#111",
+        color: "white",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      Cargando pedido...
+    </div>
+  );
+}
+
   return (
     <main
       style={{
@@ -70,14 +381,17 @@ useEffect(() => {
           margin: "auto",
         }}
       >
-        <h1
-          style={{
-            fontSize: "42px",
-            marginBottom: "30px",
-          }}
-        >
-          Checkout
-          {order && (
+<h1
+  style={{
+    fontSize: "42px",
+    marginBottom: "30px",
+  }}
+>
+  Checkout
+</h1>
+
+{order && (
+
   <div
     style={{
       background: "#1c1c1c",
@@ -142,12 +456,7 @@ useEffect(() => {
     )}
   </div>
 )}
-        </h1>
-
-    
-          
-        {/* PAGO */}
-
+     
         <div
           style={{
             background: "#1c1c1c",
@@ -382,6 +691,22 @@ useEffect(() => {
     </div>
   </div>
 
+
+<p
+  style={{
+    color: "#999",
+    marginTop: "10px",
+    fontSize: "14px",
+  }}
+>
+  Delivery: $
+  {order?.serviceType === "delivery"
+    ? Number(
+        configRestaurante?.costo_delivery || 0
+      ).toFixed(2)
+    : "0.00"}
+</p>
+
   <div
     style={{
       color: "#ff7b00",
@@ -389,14 +714,21 @@ useEffect(() => {
       fontWeight: "800",
     }}
   >
-    $
-    {order?.cart
-      ?.reduce(
-        (acc: number, item: any) =>
-          acc + item.price * item.quantity,
-        0
-      )
-      .toFixed(2)}
+ $
+{(
+  order?.cart?.reduce(
+    (acc: number, item: any) =>
+      acc + item.price * item.quantity,
+    0
+  ) +
+  (
+    order?.serviceType === "delivery"
+      ? Number(
+          configRestaurante?.costo_delivery || 0
+        )
+      : 0
+  )
+).toFixed(2)}
   </div>
 </div>
 </div>
