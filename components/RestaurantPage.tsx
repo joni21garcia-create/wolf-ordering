@@ -91,10 +91,12 @@ const {
   .eq("activo", true);
 
 
-console.log(
-  "PRIMER DESTACADO:",
-  JSON.stringify(destacados[0], null, 2)
-);
+if (destacados && destacados.length > 0) {
+  console.log(
+    "PRIMER DESTACADO:",
+    JSON.stringify(destacados[0], null, 2)
+  );
+}
 
 if (destacados) {
   setMenuDestacado(destacados);
